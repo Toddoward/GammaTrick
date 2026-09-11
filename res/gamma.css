@@ -57,6 +57,14 @@ body {
 main { max-width: 880px; margin: 0 auto; }
 a { color: var(--link); }
 
+/* 상단 탭 */
+.tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; border-radius: 99px;
+        background: var(--card); border: 1px solid var(--card-edge); box-shadow: var(--shadow); flex-wrap: wrap; }
+.tabs a { padding: 6px 14px; border-radius: 99px; color: var(--fg); text-decoration: none; font-weight: 700; font-size: 0.92rem; }
+.tabs a:hover { background: var(--pastel-soft); }
+.tabs a[aria-current="page"] { background: var(--pastel); color: var(--on-pastel); }
+.tabs a:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+
 header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
 h1 { font-size: 1.6rem; line-height: 1.3; margin: 0 0 6px; }
 h1::after {
@@ -73,7 +81,7 @@ h1::after {
 #themeToggle:focus-visible, .button:focus-visible, #dropzone:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
 
 /* ---------- 카드 ---------- */
-#dropzone, fieldset, figure {
+.dropzone, #dropzone, fieldset, figure {
     background: var(--card);
     border: 1px solid var(--card-edge);
     border-radius: 16px;
@@ -81,19 +89,26 @@ h1::after {
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
 }
-#dropzone {
+#dropzone, .dropzone {
     position: relative;
     display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center;
     min-height: 170px; padding: 24px; text-align: center;
 }
-#dropzone::before {           /* 안쪽 점선 테두리 */
+#dropzone::before, .dropzone::before {           /* 안쪽 점선 테두리 */
     content: ""; position: absolute; inset: 8px; border-radius: 12px;
     border: 2px dashed var(--line); pointer-events: none;
 }
-#dropzone.over { background-image: var(--pastel-soft); }
-#dropzone.over::before { border-color: var(--link); }
-#dropzone strong { font-size: 1.05rem; }
-#filename { color: var(--ok); font-weight: 700; }
+#dropzone.over, .dropzone.over { background-image: var(--pastel-soft); }
+#dropzone.over::before, .dropzone.over::before { border-color: var(--link); }
+#dropzone strong, .dropzone strong { font-size: 1.05rem; }
+
+/* 위장 이미지 페이지: 입력 두 칸 */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.dropzone { min-height: 200px; }
+.dropzone .preview { max-width: 100%; max-height: 140px; border-radius: 6px; }
+.dropzone .preview[hidden] { display: none; }
+.dropzone:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+#filename, .filename { color: var(--ok); font-weight: 700; }
 .linklike { color: var(--link); text-decoration: underline; cursor: pointer; background: none; border: 0; padding: 0; font: inherit; }
 
 #options { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin: 18px 0; }
@@ -103,6 +118,8 @@ legend {
     background: var(--pastel); color: var(--on-pastel);
 }
 fieldset label { display: block; margin: 5px 0; }
+fieldset label.sep { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+fieldset label.disabled { color: var(--muted); opacity: 0.6; }
 input[type=number] { width: 3.8em; }
 input[type=text], select, input[type=number] {
     padding: 5px 8px; font: inherit; color: var(--fg);

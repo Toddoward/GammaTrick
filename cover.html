@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>감마위장 · 다른 이미지로 숨기기</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@700&family=Noto+Sans+KR:wght@700&family=Noto+Sans+JP:wght@700&family=Noto+Sans+SC:wght@700&display=swap">
+    <script>
+        // 테마: 저장된 선택이 있으면 그걸, 없으면(첫 방문) 브라우저/OS의 모양 설정을 따른다. 깜빡임 방지를 위해 CSS보다 먼저 실행
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('gt-theme'); } catch (e) {}
+            if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+    <link rel="stylesheet" type="text/css" href="res/gamma.css">
+    <script src="res/gt-core.js"></script>
+    <script src="res/common.js" defer></script>
+    <script src="res/cover.js" defer></script>
+</head>
+<body>
+<main>
+    <header>
+        <div>
+            <nav class="tabs" aria-label="변환 종류">
+                <a href="gamma.html">흰 화면으로 숨기기</a>
+                <a href="cover.html" aria-current="page">다른 이미지로 숨기기</a>
+            </nav>
+            <h1>다른 이미지로 숨기기</h1>
+            <p class="sub">게시글과 썸네일에서는 위장 이미지가 보이고, 눌러서 원본으로 보면 숨긴 이미지가 나타나는 PNG를 만듭니다.</p>
+        </div>
+        <button type="button" id="themeToggle"></button>
+    </header>
+
+    <section class="pair">
+        <div class="dropzone" id="hiddenZone" tabindex="0">
+            <strong>① 숨길 원본 이미지</strong>
+            <span>사진을 눌러 원본으로 볼 때 나타날 이미지</span>
+            <span>끌어다 놓기 · <label class="linklike">파일 고르기<input type="file" id="hiddenInput" accept="image/*" hidden></label> · 붙여넣기</span>
+            <img class="preview" id="hiddenPreview" alt="" hidden>
+            <span class="filename" id="hiddenName"></span>
+        </div>
+        <div class="dropzone" id="coverZone" tabindex="0">
+            <strong>② 위장 이미지</strong>
+            <span>게시글과 썸네일에서 보일 이미지</span>
+            <span>끌어다 놓기 · <label class="linklike">파일 고르기<input type="file" id="coverInput" accept="image/*" hidden></label> · 붙여넣기</span>
+            <img class="preview" id="coverPreview" alt="" hidden>
+            <span class="filename" id="coverName"></span>
+        </div>
+    </section>
+    <p class="hint">붙여넣기(Ctrl+V)는 마지막으로 누른 칸에 들어갑니다. 누른 칸이 없으면 비어 있는 칸부터 채웁니다.</p>
+
+    <form id="options">
+        <fieldset>
+            <legend>색 단계</legend>
+            <label>채널당 <input type="number" id="levels" min="2" max="8" value="5"> 단계
+                = <span id="levelcount"></span>색</label>
+            <p class="hint" id="levelhint"></p>
+        </fieldset>
+
+        <fieldset>
+            <legend>위장 이미지 맞추기</legend>
+            <label><input type="radio" name="fit" value="crop" checked> 잘라서 채우기</label>
+            <label><input type="radio" name="fit" value="stretch"> 늘려서 채우기</label>
+            <label><input type="radio" name="fit" value="contain"> 전체 보이기 (남는 곳은 검정)</label>
+            <p class="hint">결과 이미지의 크기는 원본 이미지를 따르고, 위장 이미지를 거기에 맞춥니다.</p>
+        </fieldset>
+
+        <fieldset>
+            <legend>안내 문구</legend>
+            <label><input type="checkbox" id="textOn" checked> 위장 이미지에 안내 문구 넣기</label>
+            <div id="textOptions">
+                <label>왼쪽 위 <input type="text" id="textTL" value="사진을 눌러보세요"></label>
+                <label>오른쪽 아래 <input type="text" id="textBR" value="Tap to view"></label>
+                <p class="hint">흰 글씨에 1px 검은 외곽선을 둘러, 밝은 곳이든 어두운 곳이든 잘 보입니다.
+                    문구는 위장 이미지에만 들어가므로 원본으로 보면 사라집니다.
+                    Noto Sans 글꼴로 한글·영어·일본어·중국어 등을 쓸 수 있습니다.</p>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>크기</legend>
+            <label>최대 크기
+                <select id="maxside">
+                    <option value="0" selected>원본 크기(느림)</option>
+                    <option value="2048">2048px</option>
+                    <option value="1600">1600px</option>
+                    <option value="1280">1280px</option>
+                </select>
+            </label>
+            <p class="hint">원본 이미지의 가로·세로 중 더 긴 쪽이 이 크기를 넘으면, 비율을 유지한 채 줄입니다.
+                큰 이미지는 원본 크기로 두면 처리에 시간이 걸릴 수 있습니다.</p>
+        </fieldset>
+    </form>
+
+    <p class="hint">이 방식은 고화질(ICC 프로필) 방식으로만 만듭니다. 흰 화면 방식의 호환(gAMA) 방식으로는 위장 이미지를 만들 수 없습니다.</p>
+    <p id="status" role="status"></p>
+
+    <section id="result" hidden>
+        <div class="views">
+            <figure>
+                <canvas id="viewThumb"></canvas>
+                <figcaption>게시글·썸네일에서 보이는 모습<br><small>(색 정보가 버려진 상태)</small></figcaption>
+            </figure>
+            <figure>
+                <a id="viewLink" target="_blank"><img id="viewOrig" alt="결과 이미지"></a>
+                <figcaption>원본으로 볼 때 보이는 모습<br><small>(이 브라우저가 실제로 그린 결과)</small></figcaption>
+            </figure>
+        </div>
+        <p id="support" class="warning" hidden></p>
+        <a id="download" class="button">PNG 저장하기</a>
+        <p class="hint">결과 이미지를 그대로 올리세요. 다른 프로그램에서 편집하거나 다시 저장하면 숨김이 풀리거나 망가질 수 있습니다.
+            사이트가 썸네일을 만들 때 색 정보(ICC)를 반영하면 썸네일에서도 원본 이미지가 보일 수 있고, 원본까지 다시 압축하면 원본에서도 위장 이미지가 보일 수 있습니다.</p>
+    </section>
+</main>
+</body>
+</html>

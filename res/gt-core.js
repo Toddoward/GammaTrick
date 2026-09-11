@@ -257,7 +257,20 @@ function GTCoreFactory() {
   Bytes.prototype.zero = function (n) { for (var i = 0; i < n; i++) this.a.push(0); return this; };
   Bytes.prototype.pad4 = function () { while (this.a.length % 4) this.a.push(0); return this; };
 
-  function iccProfile(pal, triples) {
+  /*
+   * ICC 입력표: 채널 저장값 v(0..255) -> 색 변환표 격자 칸 (0 = 검정, 1..N = 팔레트)
+   *  'white': 256-N..255 만 팔레트 (흰 화면 방식)
+   *  'inset': 위 + 0..N-1 도 같은 칸 (원본 크기 그대로 테두리: 테두리 부분을 어두운 저장값으로)
+   *  'cover': 톱니 모양. 모든 v를 (v-(256-N)) mod N 칸으로 (다른 이미지로 숨기기)
+   */
+  function iccGrid(v, N, inputMode) {
+    if (inputMode === 'cover') return ((((v - (256 - N)) % N) + N) % N) + 1;
+    if (v >= 256 - N) return v - (256 - N) + 1;
+    if (inputMode === 'inset' && v < N) return v + 1;
+    return 0;
+  }
+
+  function iccProfile(pal, triples, inputMode) {
     var N = pal.N, G = N + 1, K = pal.colors.length;
     // 격자 좌표: 0 = "256-N 미만" (테두리/글씨 → 검정), k+1 = 저장값 256-N+k
     var lut = new Array(G * G * G);
@@ -279,7 +292,7 @@ function GTCoreFactory() {
     [1, 0, 0, 0, 1, 0, 0, 0, 1].forEach(function (v) { a2b.s15(v); });
     a2b.u16(256).u16(2);
     for (var ch = 0; ch < 3; ch++) for (var v = 0; v < 256; v++) {
-      var gpos = v < 256 - N ? 0 : (v - (256 - N) + 1) / (G - 1);
+      var gpos = iccGrid(v, N, inputMode) / (G - 1);
       a2b.u16(Math.round(gpos * 65535));
     }
     // (Chromium/skcms 실측: lut16 XYZ PCS는 1.0 = 65535 로 해석됨)
@@ -369,22 +382,34 @@ function GTCoreFactory() {
     else pal = adaptivePalette(rgba, w, h, N * N * N);
     var idx = dither(rgba, w, h, pal, opts.kernel);
     var st = assignStored(pal, idx);
-    var B = opts.border | 0, W = w + 2 * B, H = h + 2 * B;
+    // 원본 크기 그대로 테두리 (ICC 전용): 이미지를 키우지 않고 가장자리 B px를 테두리로 쓴다
+    var inset = !!opts.insetBorder && pal.mode === 'icc';
+    var B = opts.border | 0, pad = inset ? 0 : B, W = w + 2 * pad, H = h + 2 * pad;
     var stored = new Uint8Array(W * H * 3);
     for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
-      var s = st.map(idx[y * w + x]), o = ((y + B) * W + x + B) * 3;
+      var s = st.map(idx[y * w + x]), o = ((y + pad) * W + x + pad) * 3;
       stored[o] = s[0]; stored[o + 1] = s[1]; stored[o + 2] = s[2];
     }
-    if (opts.overlay) {
-      // 테두리 글씨. 'hide': 저장값 235 이하 회색 → 미리보기엔 흰 글씨, 원본 보기에선 검정(테두리와 같은 색)으로 사라짐
-      //             'show': 원본 보기에서도 흰색으로 보이는 저장값 사용 (안티앨리어싱 없이 이진화)
-      var ov = opts.overlay, show = opts.overlayMode === 'show', white = [255, 255, 255];
-      if (show && pal.mode === 'icc') {
-        for (var k = 0; k < pal.colors.length; k++) {
-          var cc = pal.colors[k];
-          if (cc[0] === 1 && cc[1] === 1 && cc[2] === 1) { white = st.triples[k]; break; }
+    if (inset) {
+      // 테두리 부분은 저장값을 256-N 만큼 내려 0..N-1(검정)로. ICC 입력표가 두 대역을 같은 칸으로 읽으므로
+      // 원본 보기에서는 가장자리까지 원래 이미지 색이 그대로 나온다.
+      // 글씨(이진화)는 밝은 대역을 그대로 두어 썸네일에서 흰 글씨, 원본 보기에서는 이미지 색(= 사라짐).
+      // 'show'면 글씨를 팔레트의 흰색으로 바꿔 원본 보기에서도 흰 글씨.
+      var ovI = opts.overlay, showI = opts.overlayMode === 'show', whiteI = whiteTriple(pal, st), down = 256 - N;
+      for (var p0 = 0; p0 < W * H; p0++) {
+        var y0 = Math.floor(p0 / W), x0 = p0 % W;
+        if (y0 >= B && y0 < H - B && x0 >= B && x0 < W - B) continue;
+        var isText = ovI && ovI[p0] >= 0.5;
+        if (isText) {
+          if (showI) { stored[p0 * 3] = whiteI[0]; stored[p0 * 3 + 1] = whiteI[1]; stored[p0 * 3 + 2] = whiteI[2]; }
+        } else {
+          stored[p0 * 3] -= down; stored[p0 * 3 + 1] -= down; stored[p0 * 3 + 2] -= down;
         }
       }
+    } else if (opts.overlay) {
+      // 테두리 글씨. 'hide': 저장값 235 이하 회색 → 미리보기엔 흰 글씨, 원본 보기에선 검정(테두리와 같은 색)으로 사라짐
+      //             'show': 원본 보기에서도 흰색으로 보이는 저장값 사용 (안티앨리어싱 없이 이진화)
+      var ov = opts.overlay, show = opts.overlayMode === 'show', white = whiteTriple(pal, st);
       var hideVal = Math.min(235, 255 - N - 5);
       for (var p = 0; p < W * H; p++) {
         var yy = Math.floor(p / W), xx = p % W;
@@ -397,14 +422,53 @@ function GTCoreFactory() {
         }
       }
     }
-    var extra = pal.mode === 'gama' ? { gAMA: pal.gAMA } : { icc: iccProfile(pal, st.triples) };
+    var inputMode = inset ? 'inset' : 'white';
+    var extra = pal.mode === 'gama' ? { gAMA: pal.gAMA } : { icc: iccProfile(pal, st.triples, inputMode) };
     return encodePNG(stored, W, H, extra, deflate).then(function (png) {
-      return { png: png, stored: stored, W: W, H: H, pal: pal, shown: opts.simulate ? simulateShown(stored, W, H, pal, st) : null };
+      return { png: png, stored: stored, W: W, H: H, pal: pal, shown: opts.simulate ? simulateShown(stored, W, H, pal, st, inputMode) : null };
+    });
+  }
+
+  // 원본 보기에서 흰색으로 보이는 저장값 (gAMA: 255, ICC: 팔레트의 순백에 배정된 조합)
+  function whiteTriple(pal, st) {
+    if (pal.mode === 'icc') {
+      for (var k = 0; k < pal.colors.length; k++) {
+        var c = pal.colors[k];
+        if (c[0] === 1 && c[1] === 1 && c[2] === 1) return st.triples[k];
+      }
+    }
+    return [255, 255, 255];
+  }
+
+  /*
+   * 다른 이미지로 숨기기 (ICC 전용)
+   *  hidden: 원본 보기에서 나올 이미지, cover: 썸네일(게시글)에서 보일 위장 이미지. 둘 다 w*h RGBA
+   *  저장값 = 위장 이미지 색에 가장 가까우면서, N으로 나눈 나머지가 숨긴 색 번호와 같은 값
+   *  → 썸네일은 위장 이미지(채널당 오차 최대 ±N/2, 0·255 끝에서만 최대 N-1), 원본 보기는 숨긴 이미지
+   */
+  function encodeCover(hidden, cover, w, h, opts, deflate) {
+    var N = opts.N, pal = adaptivePalette(hidden, w, h, N * N * N);
+    var idx = dither(hidden, w, h, pal, opts.kernel);
+    var st = assignStored(pal, idx);
+    var stored = new Uint8Array(w * h * 3);
+    for (var p = 0; p < w * h; p++) {
+      var t = st.map(idx[p]);
+      for (var c = 0; c < 3; c++) {
+        var cv = cover[p * 4 + c], d = (((t[c] - cv) % N) + N) % N;
+        if (d > N / 2) d -= N;
+        var v = cv + d;
+        if (v < 0) v += N; else if (v > 255) v -= N;
+        stored[p * 3 + c] = v;
+      }
+    }
+    var icc = iccProfile(pal, st.triples, 'cover');
+    return encodePNG(stored, w, h, { icc: icc }, deflate).then(function (png) {
+      return { png: png, stored: stored, W: w, H: h, pal: pal, shown: opts.simulate ? simulateShown(stored, w, h, pal, st, 'cover') : null };
     });
   }
 
   // 원본 보기에서 보일 선형광 값 (검증/미리보기용)
-  function simulateShown(stored, W, H, pal, st) {
+  function simulateShown(stored, W, H, pal, st, inputMode) {
     var out = new Float32Array(W * H * 3), N = pal.N, base = 256 - N, lut = {};
     if (pal.mode === 'icc') st.triples.forEach(function (t, k) { lut[(t[0] << 16) | (t[1] << 8) | t[2]] = pal.colors[k]; });
     var invG = pal.mode === 'gama' ? 100000 / pal.gAMA : 0;
@@ -413,8 +477,11 @@ function GTCoreFactory() {
       if (pal.mode === 'gama') {
         out[p * 3] = Math.pow(r / 255, invG); out[p * 3 + 1] = Math.pow(g / 255, invG); out[p * 3 + 2] = Math.pow(b / 255, invG);
       } else {
-        var c = (r >= base && g >= base && b >= base) ? lut[(r << 16) | (g << 8) | b] : null;
-        if (c) { out[p * 3] = c[0]; out[p * 3 + 1] = c[1]; out[p * 3 + 2] = c[2]; }
+        var gr = iccGrid(r, N, inputMode), gg = iccGrid(g, N, inputMode), gb = iccGrid(b, N, inputMode);
+        if (gr && gg && gb) {
+          var c = lut[((base + gr - 1) << 16) | ((base + gg - 1) << 8) | (base + gb - 1)];
+          if (c) { out[p * 3] = c[0]; out[p * 3 + 1] = c[1]; out[p * 3 + 2] = c[2]; }
+        }
       }
     }
     return out;
@@ -423,7 +490,7 @@ function GTCoreFactory() {
   var api = {
     S2L: S2L, linToSrgb: linToSrgb, oklab: oklab,
     gamaPalette: gamaPalette, adaptivePalette: adaptivePalette, dither: dither,
-    assignStored: assignStored, iccProfile: iccProfile, encodePNG: encodePNG, encode: encode
+    assignStored: assignStored, iccProfile: iccProfile, encodePNG: encodePNG, encode: encode, encodeCover: encodeCover
   };
   return api;
 }
