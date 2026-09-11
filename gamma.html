@@ -1,53 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>감마위장</title>
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@700&family=Noto+Sans+KR:wght@700&family=Noto+Sans+JP:wght@700&family=Noto+Sans+SC:wght@700&display=swap">
     <link rel="stylesheet" type="text/css" href="res/gamma.css">
-    <script src = "res/jquery-3.4.1.min.js"></script>
-    <script src = "res/crc32.js"></script>
-    <script src = "res/default-image.js"></script>
-    <script src = "res/color.js"></script>
-    <script src = "res/converters.js"></script>
-    <script src = "res/convert-image.js"></script>
-    <script src = "res/gamma.js"></script>
+    <script src="res/default-image.js"></script>
+    <script src="res/gt-core.js"></script>
+    <script src="res/gamma.js" defer></script>
 </head>
 <body>
-    <div id="filearea">
-        <div id="dropzone">
-            <h1>
-                클릭했을 때만 보이는 이미지 생성기
-            </h1>
-            <h4>
-                <span class="warning">
-                    ※결과 이미지를 다른이름으로 저장 X<br>
-                </span>
-                (링크를 다른이름으로 저장 or
-                이미지를 그냥 클릭하여 저장)<br>
-                ※환경에 따라 이미지가 그대로 보일 수 있음
-                <br>
-                ※구버전 공앱에서 이상하게 보일 수 있음
-            </h4>
-            <h3>
-                여기에 숨길 이미지를 드래그&드롭
-            </h3>
-            <div id="result">
+<main>
+    <h1>클릭했을 때만 보이는 이미지 생성기</h1>
+    <p class="sub">썸네일에서는 하얀 화면, 눌러서 원본으로 보면 이미지가 나타나는 PNG를 만듭니다.</p>
+
+    <section id="dropzone" tabindex="0">
+        <strong>여기에 숨길 이미지를 끌어다 놓기</strong>
+        <span>또는 <label class="linklike">파일 고르기<input type="file" id="fileinput" accept="image/*" hidden></label>
+            · 붙여넣기(Ctrl+V) · <button type="button" id="sample" class="linklike">예시 이미지로 해보기</button></span>
+        <span id="filename"></span>
+    </section>
+
+    <form id="options">
+        <fieldset>
+            <legend>숨기는 방식</legend>
+            <label><input type="radio" name="mode" value="icc" checked> <b>고화질</b> (ICC 프로필, 권장)</label>
+            <label><input type="radio" name="mode" value="gama"> <b>호환</b> (gAMA, 원래 방식)</label>
+            <p class="hint" id="modehint"></p>
+        </fieldset>
+
+        <fieldset>
+            <legend>색 단계</legend>
+            <label>채널당 <input type="number" id="levels" min="2" max="8" value="5"> 단계
+                = <span id="levelcount"></span>색</label>
+            <canvas id="palettepreview" width="160" height="60"></canvas>
+            <p class="hint">위 네모의 왼쪽(순백)과 오른쪽이 달라 보이면 단계를 줄이세요.
+                단계가 많을수록 원본은 선명해지고, 썸네일에 비치는 잔상은 조금씩 진해집니다.</p>
+        </fieldset>
+
+        <fieldset>
+            <legend>테두리 안내 문구</legend>
+            <label><input type="checkbox" id="textOn" checked> 검은 테두리에 안내 문구 넣기</label>
+            <div id="textOptions">
+                <label>왼쪽 위 <input type="text" id="textTL" value="사진을 눌러보세요"></label>
+                <label>오른쪽 아래 <input type="text" id="textBR" value="Tap to view"></label>
+                <label><input type="checkbox" id="textHide" checked> 원본으로 볼 때는 문구 숨기기</label>
+                <p class="hint">Noto Sans 글꼴로 한글·영어·일본어·중국어 등을 쓸 수 있습니다.</p>
             </div>
-        </div>
-        <form id="fileform">
-            혹은 탐색기에서 찾기: <input type="file" id="fileinput">
-        </form>
-    </div>
-    <br>
-    <form id="paletteform">
-        <canvas id="palettepreview" width="200" height="100">
-        </canvas><br>
-        위 이미지의 양쪽 흰색이 달라보이면 색 종류를 줄일 것<br>
-        색 종류:
-        <input type="number" id="numinput"
-            min="1" max="256" value="4">³ =
-            <span id="numresult"></span><br>
-        <input type="submit" value="팔레트 업데이트">
+        </fieldset>
+
+        <fieldset>
+            <legend>크기</legend>
+            <label>긴 변 최대
+                <select id="maxside">
+                    <option value="1280">1280px</option>
+                    <option value="1600" selected>1600px</option>
+                    <option value="2048">2048px</option>
+                    <option value="0">줄이지 않음 (느림)</option>
+                </select>
+            </label>
+        </fieldset>
     </form>
+
+    <p id="status" role="status"></p>
+
+    <section id="result" hidden>
+        <div class="views">
+            <figure>
+                <canvas id="viewThumb"></canvas>
+                <figcaption>썸네일에서 보이는 모습<br><small>(색 정보가 버려진 상태)</small></figcaption>
+            </figure>
+            <figure>
+                <a id="viewLink" target="_blank"><img id="viewOrig" alt="결과 이미지"></a>
+                <figcaption>원본으로 볼 때 보이는 모습<br><small>(이 브라우저가 실제로 그린 결과)</small></figcaption>
+            </figure>
+        </div>
+        <p id="support" class="warning" hidden></p>
+        <a id="download" class="button">PNG 저장하기</a>
+        <p class="hint">결과 이미지를 그대로 올리세요. 다른 프로그램에서 편집하거나 다시 저장하면 숨김이 풀리거나 망가질 수 있습니다.
+            사이트에 따라 썸네일에서도 그대로 보이거나(색 정보를 반영하는 경우), 원본에서도 하얗게 보일 수 있습니다(원본까지 다시 압축하는 경우).</p>
+    </section>
+</main>
 </body>
+</html>
