@@ -9,7 +9,8 @@
  * 공통: 저장되는 픽셀은 채널당 256-N..255 (거의 흰색)만 사용하고,
  *       디더링은 선형광(linear light) 공간에서 오차 확산으로 수행한다.
  */
-(function (root) {
+// 전체를 함수 하나로 감싸 둔다: 화면 스레드와 Web Worker(소스 문자열로 생성) 양쪽에서 같은 코드를 쓰기 위함
+function GTCoreFactory() {
   'use strict';
 
   // ---------- 색 공간 ----------
@@ -359,7 +360,8 @@
    * opts: { mode:'icc'|'gama', N, darkest(gama 전용), kernel, border, overlay }
    *   overlay(선택): 테두리 영역에 찍을 글씨 마스크 (Float32Array, 최종 크기 W*H, 0..1)
    *   overlayMode : 'hide'(기본, 원본 보기에선 글씨가 사라짐) | 'show'(원본 보기에서도 보임)
-   * 반환: { png, stored(Uint8Array W*H*3), shown(Float32 선형광 W*H*3), W, H, pal }
+   *   simulate    : true면 원본 보기에서 보일 선형광 값(shown)도 계산 (검증용)
+   * 반환: { png, stored(Uint8Array W*H*3), shown(Float32 선형광 W*H*3 또는 null), W, H, pal }
    */
   function encode(rgba, w, h, opts, deflate) {
     var N = opts.N, pal;
@@ -397,7 +399,7 @@
     }
     var extra = pal.mode === 'gama' ? { gAMA: pal.gAMA } : { icc: iccProfile(pal, st.triples) };
     return encodePNG(stored, W, H, extra, deflate).then(function (png) {
-      return { png: png, stored: stored, W: W, H: H, pal: pal, shown: simulateShown(stored, W, H, pal, st) };
+      return { png: png, stored: stored, W: W, H: H, pal: pal, shown: opts.simulate ? simulateShown(stored, W, H, pal, st) : null };
     });
   }
 
@@ -423,6 +425,10 @@
     gamaPalette: gamaPalette, adaptivePalette: adaptivePalette, dither: dither,
     assignStored: assignStored, iccProfile: iccProfile, encodePNG: encodePNG, encode: encode
   };
+  return api;
+}
+(function (root) {
+  var api = GTCoreFactory();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else root.GTCore = api;
+  else { root.GTCore = api; root.GTCoreFactory = GTCoreFactory; }
 })(this);

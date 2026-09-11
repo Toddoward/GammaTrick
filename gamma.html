@@ -7,6 +7,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@700&family=Noto+Sans+KR:wght@700&family=Noto+Sans+JP:wght@700&family=Noto+Sans+SC:wght@700&display=swap">
+    <script>
+        // 테마: 저장된 선택이 있으면 그걸, 없으면(첫 방문) 브라우저/OS의 모양 설정을 따른다. 깜빡임 방지를 위해 CSS보다 먼저 실행
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('gt-theme'); } catch (e) {}
+            if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
     <link rel="stylesheet" type="text/css" href="res/gamma.css">
     <script src="res/default-image.js"></script>
     <script src="res/gt-core.js"></script>
@@ -14,8 +23,13 @@
 </head>
 <body>
 <main>
-    <h1>클릭했을 때만 보이는 이미지 생성기</h1>
-    <p class="sub">썸네일에서는 하얀 화면, 눌러서 원본으로 보면 이미지가 나타나는 PNG를 만듭니다.</p>
+    <header>
+        <div>
+            <h1>클릭했을 때만 보이는 이미지 생성기</h1>
+            <p class="sub">썸네일에서는 하얀 화면, 눌러서 원본으로 보면 이미지가 나타나는 PNG를 만듭니다.</p>
+        </div>
+        <button type="button" id="themeToggle"></button>
+    </header>
 
     <section id="dropzone" tabindex="0">
         <strong>여기에 숨길 이미지를 끌어다 놓기</strong>
@@ -54,14 +68,16 @@
 
         <fieldset>
             <legend>크기</legend>
-            <label>긴 변 최대
+            <label>최대 크기
                 <select id="maxside">
-                    <option value="1280">1280px</option>
-                    <option value="1600" selected>1600px</option>
+                    <option value="0" selected>원본 크기(느림)</option>
                     <option value="2048">2048px</option>
-                    <option value="0">줄이지 않음 (느림)</option>
+                    <option value="1600">1600px</option>
+                    <option value="1280">1280px</option>
                 </select>
             </label>
+            <p class="hint">이미지의 가로·세로 중 더 긴 쪽이 이 크기를 넘으면, 비율을 유지한 채 줄입니다.
+                큰 이미지는 원본 크기로 두면 처리에 시간이 걸릴 수 있습니다.</p>
         </fieldset>
     </form>
 

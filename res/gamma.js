@@ -6,6 +6,26 @@
   var GAMA_DARKEST = 0.005;   // gAMA 방식의 가장 어두운 레벨 (선형광). 실험으로 고른 값
   var srcBlob = null, srcName = 'image', lastUrl = null, busy = false, again = false;
 
+  // ---------- 테마 (라이트 ☀️ / 다크 🌙) ----------
+  var root = document.documentElement, mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function savedTheme() { try { return localStorage.getItem('gt-theme'); } catch (e) { return null; } }
+  function applyTheme(t) {
+    root.setAttribute('data-theme', t);
+    var btn = $('#themeToggle'), dark = t === 'dark';
+    btn.textContent = dark ? '☀️' : '🌙';               // 누르면 바뀔 모드를 보여줌
+    btn.title = dark ? '라이트 모드로 전환' : '다크 모드로 전환';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  applyTheme(root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+  $('#themeToggle').addEventListener('click', function () {
+    var t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('gt-theme', t); } catch (e) {}
+    applyTheme(t);
+  });
+  // 직접 고른 적이 없으면 브라우저 설정이 바뀔 때 따라감
+  var onScheme = function (e) { if (!savedTheme()) applyTheme(e.matches ? 'dark' : 'light'); };
+  if (mq.addEventListener) mq.addEventListener('change', onScheme); else if (mq.addListener) mq.addListener(onScheme);
+
   // ---------- 입력 ----------
   function setSource(blob, name) {
     if (!blob || !/^image\//.test(blob.type || 'image/')) return;
@@ -82,6 +102,46 @@
     return new Response(stream).arrayBuffer().then(function (b) { return new Uint8Array(b); });
   }
 
+  // ---------- Web Worker ----------
+  // 큰 이미지도 화면이 멈추지 않도록 인코딩은 워커에서 한다.
+  // gt-core.js를 소스 문자열로 워커에 넣으므로 file:// 로 열어도 동작한다. 워커를 못 쓰면 화면 스레드에서 처리.
+  var worker = null, workerFailed = false, jobId = 0;
+  function workerMain() {
+    var GT = GTCoreFactory();
+    function deflateW(u8) {
+      var st = new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate'));
+      return new Response(st).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+    }
+    self.onmessage = function (e) {
+      var d = e.data;
+      GT.encode(d.rgba, d.w, d.h, d.opts, deflateW).then(function (r) {
+        self.postMessage({ id: d.id, png: r.png, stored: r.stored, W: r.W, H: r.H }, [r.png.buffer, r.stored.buffer]);
+      }).catch(function (err) { self.postMessage({ id: d.id, error: String((err && err.message) || err) }); });
+    };
+  }
+  function encodeAsync(rgba, w, h, o) {
+    if (!worker && !workerFailed) {
+      try {
+        var src = GTCoreFactory.toString() + '\n(' + workerMain.toString() + ')();';
+        worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      } catch (e) { workerFailed = true; worker = null; }
+    }
+    if (!worker) return GTCore.encode(rgba, w, h, o, deflate);
+    return new Promise(function (resolve, reject) {
+      var id = ++jobId;
+      worker.onmessage = function (e) {
+        if (e.data.id !== id) return;
+        if (e.data.error) reject(new Error(e.data.error)); else resolve(e.data);
+      };
+      worker.onerror = function (e) {
+        if (e.preventDefault) e.preventDefault();
+        workerFailed = true; worker = null;
+        GTCore.encode(rgba, w, h, o, deflate).then(resolve, reject);
+      };
+      worker.postMessage({ id: id, rgba: rgba, w: w, h: h, opts: o });
+    });
+  }
+
   function layout(w, h, textOn) {
     // 글씨 크기는 이미지 크기에 비례, 테두리는 글씨가 들어갈 만큼
     var font = Math.max(11, Math.min(32, Math.round(Math.min(w, h) * 0.028)));
@@ -121,8 +181,9 @@
     if (!srcBlob) return;
     if (busy) { again = true; return; }
     busy = true;
-    var o = opts();
+    var o = opts(), t0 = Date.now();
     status('처리 중…');
+    var timer = setInterval(function () { status('처리 중… ' + Math.round((Date.now() - t0) / 1000) + '초'); }, 1000);
     loadImage(srcBlob).then(function (img) {
       var w = img.naturalWidth, h = img.naturalHeight, s = 1;
       if (o.maxSide > 0 && Math.max(w, h) > o.maxSide) s = o.maxSide / Math.max(w, h);
@@ -137,15 +198,17 @@
       return fontReady(L.font, o.textTL + o.textBR).then(function () {
         var overlay = o.textOn && (o.textTL || o.textBR) ? textMask(W, H, L.border, L.font, o.textTL, o.textBR) : null;
         return new Promise(function (r) { setTimeout(r, 30); }).then(function () {   // '처리 중' 표시가 먼저 그려지도록
-          return GTCore.encode(rgba, w, h, {
+          return encodeAsync(rgba, w, h, {
             mode: o.mode, N: o.N, darkest: GAMA_DARKEST, kernel: 'floyd',
             border: L.border, overlay: overlay, overlayMode: o.textHide ? 'hide' : 'show'
-          }, deflate);
+          });
         });
       });
-    }).then(show).catch(function (e) {
+    }).then(function (res) { clearInterval(timer); show(res); }).catch(function (e) {
+      clearInterval(timer);
       status('오류: ' + e.message);
     }).then(function () {
+      clearInterval(timer);
       busy = false;
       if (again) { again = false; run(); }
     });
