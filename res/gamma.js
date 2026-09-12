@@ -2,7 +2,13 @@
 (function () {
   'use strict';
   var U = GTUI, $ = U.$;
-  var GAMA_DARKEST = 0.005;   // gAMA 방식의 가장 어두운 레벨 (선형광). 실험으로 고른 값
+  /*
+   * gAMA 방식에서 가장 어두운 레벨의 sRGB 값. 레벨 간격은 이 값 하나로 정해진다(코드 공간 등비).
+   * 32 => 4단계일 때 32 / 64 / 128 / 255. 실험으로 고른 절충점:
+   *   더 낮추면(원래 15) 레벨 간격이 벌어져 밝은 면에 색 알갱이가 끼고,
+   *   더 올리면(원본 레포 64) 간격은 좁아지지만 검정이 회색으로 떠 버린다.
+   */
+  var GAMA_FLOOR = 32;
   var srcBlob = null, srcName = 'image', busy = false, again = false;
 
   U.initTheme();
@@ -33,7 +39,7 @@
     var mode = document.querySelector('input[name=mode]:checked').value;
     return {
       mode: mode,
-      N: Math.max(2, Math.min(8, parseInt($('#levels').value, 10) || 5)),
+      N: Math.max(2, Math.min(8, parseInt($('#levels').value, 10) || 4)),
       inset: mode === 'icc' && $('#inset').checked,
       textOn: $('#textOn').checked,
       textTL: $('#textTL').value.trim(),
@@ -60,7 +66,7 @@
     ctx.fillStyle = 'rgb(' + d + ',' + d + ',' + d + ')'; ctx.fillRect(80, 0, 80, 60);
   }
   // 방식별 기본 단계: 썸네일 잔상이 원래 레포(4단계)보다 진하지 않은 선에서 가장 좋은 값
-  var DEFAULT_LEVELS = { icc: 5, gama: 4 };
+  var DEFAULT_LEVELS = { icc: 4, gama: 4 };
   $('#options').addEventListener('change', function (e) {
     if (e.target.name === 'mode') $('#levels').value = DEFAULT_LEVELS[e.target.value];
     refreshOptionsUI(); run();
@@ -101,13 +107,16 @@
         var overlay = o.textOn && (o.textTL || o.textBR) ? textMask(W, H, B, font, o.textTL, o.textBR) : null;
         return U.nextFrame().then(function () {
           return U.encodeAsync('encode', [rgba, w, h, {
-            mode: o.mode, N: o.N, darkest: GAMA_DARKEST, kernel: 'floyd',
+            mode: o.mode, N: o.N, darkest: GTCore.S2L[GAMA_FLOOR], kernel: 'floyd',
             border: B, insetBorder: o.inset, overlay: overlay, overlayMode: o.textHide ? 'hide' : 'show'
           }]);
         });
       });
     }).then(function (res) {
-      stop(); U.showResult(res, srcName + '_gamma.png');
+      stop();
+      U.showResult(res, U.outputName(srcName, [
+        'w' + o.N, 'white', o.inset ? 'inset' : '', o.textOn && (o.textTL || o.textBR) ? 'hint' : '', o.mode === 'gama' ? 'gama' : ''
+      ]));
     }).catch(function (e) {
       stop(); U.status('오류: ' + e.message);
     }).then(function () {

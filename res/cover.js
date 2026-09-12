@@ -41,7 +41,7 @@
   // ---------- 옵션 ----------
   function opts() {
     return {
-      N: Math.max(2, Math.min(8, parseInt($('#levels').value, 10) || 5)),
+      N: Math.max(2, Math.min(8, parseInt($('#levels').value, 10) || 4)),
       fit: document.querySelector('input[name=fit]:checked').value,
       textOn: $('#textOn').checked,
       textTL: $('#textTL').value.trim(),
@@ -99,7 +99,10 @@
         });
       });
     }).then(function (res) {
-      stop(); U.showResult(res, slots.hidden.name + '_cover.png');
+      stop();
+      U.showResult(res, U.outputName(slots.hidden.name, [
+        'w' + o.N, 'cover', o.textOn && (o.textTL || o.textBR) ? 'hint' : ''
+      ]));
     }).catch(function (e) {
       stop(); U.status('오류: ' + e.message);
     }).then(function () {

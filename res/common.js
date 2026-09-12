@@ -176,6 +176,25 @@
     } catch (e) { warn.hidden = true; }
   }
 
+  // ---------- 결과 파일 이름 ----------
+  /*
+   * 게시판 다운로드 주소에는 파일 이름이 그대로 들어간다. #, & 같은 문자가 있으면
+   * 주소가 중간에서 잘려 다운로드가 실패하므로 미리 지운다.
+   * 그리고 어떤 설정으로 만든 파일인지 알 수 있게 요약을 덧붙인다. 예) 사진_w4_white_hint.png
+   */
+  function safeName(name) {
+    return String(name || 'image')
+      .replace(/\.[^.]+$/, '')
+      .replace(/[#&?%+/\\:*"'<>|=@]/g, '')   // 주소를 깨뜨릴 수 있는 문자 제거
+      .replace(/\s+/g, '_')
+      .replace(/_{2,}/g, '_')
+      .replace(/^[_.]+|[_.]+$/g, '')
+      .slice(0, 60) || 'image';
+  }
+  function outputName(name, parts) {
+    return safeName(name) + '_' + parts.filter(Boolean).join('_') + '.png';
+  }
+
   // ---------- 파일 입력 도우미 ----------
   function isImage(f) { return f && /^image\//.test(f.type || 'image/'); }
   // 드롭존 하나에 클릭·끌어다 놓기를 연결
@@ -198,6 +217,7 @@
     $: $, FONT_STACK: FONT_STACK, initTheme: initTheme, loadImage: loadImage, fitSize: fitSize, rasterize: rasterize,
     encodeAsync: encodeAsync, fontReady: fontReady, fontSizeFor: fontSizeFor, setFittedFont: setFittedFont,
     status: status, startTimer: startTimer, nextFrame: nextFrame, showResult: showResult,
-    isImage: isImage, bindDropzone: bindDropzone, pastedImage: pastedImage
+    isImage: isImage, bindDropzone: bindDropzone, pastedImage: pastedImage,
+    safeName: safeName, outputName: outputName
   };
 })(this);
