@@ -52,8 +52,8 @@
   function refreshOptionsUI() {
     var o = opts();
     $('#levelcount').textContent = o.N * o.N * o.N;
-    $('#levelhint').textContent = '원본 이미지를 ' + (o.N * o.N * o.N) + '색으로 담습니다. 단계가 많을수록 원본은 선명해지고, '
-      + '위장 이미지는 채널마다 최대 ±' + Math.floor(o.N / 2) + '만큼 흔들려 조금씩 거칠어집니다.';
+    $('#levelhint').textContent = '원본을 ' + (o.N * o.N * o.N) + '색으로 담습니다. '
+      + '단계가 많을수록 원본은 선명해지고 위장 이미지가 거칠어집니다.';
     $('#textOptions').hidden = !o.textOn;
   }
   $('#options').addEventListener('change', function () { refreshOptionsUI(); run(); });

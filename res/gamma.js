@@ -52,8 +52,8 @@
     var o = opts();
     $('#levelcount').textContent = o.N * o.N * o.N;
     $('#modehint').textContent = o.mode === 'icc'
-      ? '이미지에 맞춘 ' + (o.N * o.N * o.N) + '색 팔레트를 ICC 프로필에 담습니다. 화질이 훨씬 좋습니다.'
-      : '채널마다 ' + o.N + '단계로 고정된 색만 씁니다. 원래 레포와 같은 방식이라 지원 환경이 가장 넓습니다.';
+      ? '이미지에 맞춘 ' + (o.N * o.N * o.N) + '색을 씁니다. 화질이 좋습니다.'
+      : '고정된 ' + (o.N * o.N * o.N) + '색만 씁니다. 지원 환경이 가장 넓습니다.';
     // '원본 크기 그대로 테두리 생성'은 ICC 방식에서만 가능
     var inset = $('#inset');
     inset.disabled = o.mode !== 'icc';

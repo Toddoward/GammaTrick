@@ -50,11 +50,11 @@
             <label><input type="radio" name="mode" value="gama"> <b>호환</b> (gAMA, 원래 방식)</label>
             <p class="hint" id="modehint"></p>
             <label id="insetLabel" class="sep"><input type="checkbox" id="inset"> 원본 크기 그대로 테두리 생성</label>
-            <p class="hint">이미지 크기를 늘리지 않고, 사진 가장자리를 검은 테두리로 씁니다.
-                썸네일에서는 검은 테두리와 안내 문구가 보이지만, 원본으로 보면 테두리 자리까지 사진이 그대로 나옵니다.
-                끄면 테두리를 사진 바깥에 덧붙이므로, 원본으로 볼 때도 검은 테두리가 남습니다.
-                켜면 안내 문구가 흑백 두 값으로만 그려져, 글씨 가장자리가 부드럽지 않고 픽셀처럼 각지게 보입니다.
-                고화질(ICC) 방식에서만 쓸 수 있습니다.</p>
+            <ul class="hint">
+                <li>이미지를 <b>키우지 않고</b> 사진 가장자리를 테두리로 씁니다.</li>
+                <li>원본으로 보면 <b>테두리 없이</b> 사진 전체가 나옵니다.</li>
+                <li>안내 문구는 <b>픽셀처럼 각지게</b> 그려집니다.</li>
+            </ul>
         </fieldset>
 
         <fieldset>
@@ -62,8 +62,8 @@
             <label>채널당 <input type="number" id="levels" min="2" max="8" value="4"> 단계
                 = <span id="levelcount"></span>색</label>
             <canvas id="palettepreview" width="160" height="60"></canvas>
-            <p class="hint">위 네모의 왼쪽(순백)과 오른쪽이 달라 보이면 단계를 줄이세요.
-                단계가 많을수록 원본은 선명해지고, 썸네일에 비치는 잔상은 조금씩 진해집니다.</p>
+            <p class="hint">네모의 <b>좌우 흰색이 달라 보이면</b> 단계를 줄이세요.
+                단계가 많을수록 원본은 선명해지고 썸네일 잔상은 진해집니다.</p>
         </fieldset>
 
         <fieldset>
@@ -73,7 +73,7 @@
                 <label>왼쪽 위 <input type="text" id="textTL" value="사진을 눌러보세요"></label>
                 <label>오른쪽 아래 <input type="text" id="textBR" value="Tap to view"></label>
                 <label><input type="checkbox" id="textHide" checked> 원본으로 볼 때는 문구 숨기기</label>
-                <p class="hint">Noto Sans 글꼴로 한글·영어·일본어·중국어 등을 쓸 수 있습니다.</p>
+                <p class="hint">한글·영어·일본어·중국어를 쓸 수 있습니다.</p>
             </div>
         </fieldset>
 
@@ -87,8 +87,7 @@
                     <option value="1280">1280px</option>
                 </select>
             </label>
-            <p class="hint">이미지의 가로·세로 중 더 긴 쪽이 이 크기를 넘으면, 비율을 유지한 채 줄입니다.
-                큰 이미지는 원본 크기로 두면 처리에 시간이 걸릴 수 있습니다.</p>
+            <p class="hint">가로·세로 중 <b>긴 쪽</b> 기준입니다. 원본 크기는 처리가 느릴 수 있습니다.</p>
         </fieldset>
     </form>
 
@@ -107,9 +106,11 @@
         </div>
         <p id="support" class="warning" hidden></p>
         <a id="download" class="button">PNG 저장하기</a>
-        <p class="hint">결과 이미지를 그대로 올리세요. 다른 프로그램에서 편집하거나 다시 저장하면 숨김이 풀리거나 망가질 수 있습니다.
-            사이트에 따라 썸네일에서도 그대로 보이거나(색 정보를 반영하는 경우), 원본에서도 하얗게 보일 수 있습니다(원본까지 다시 압축하는 경우).</p>
-        <p class="hint"><strong>PC 게시판에서는 가로 860px 이상을 권합니다.</strong> 게시판이 큰 이미지만 줄여서 싣고 그때만 "원본 보기" 클릭이 생기기 때문에, 그보다 작으면 눌러도 원본이 안 열릴 수 있습니다. 모바일은 크기와 상관없이 열리고, 글 하단 첨부파일 목록으로는 언제나 원본을 받을 수 있습니다.
+        <ul class="hint">
+            <li>결과 이미지를 <b>그대로</b> 올리세요. 편집하거나 다시 저장하면 숨김이 풀립니다.</li>
+            <li>PC 게시판은 <b>가로 860px 이상</b>이어야 눌러서 원본 보기가 뜹니다(모바일은 무관).</li>
+            <li>사이트에 따라 썸네일에서 그대로 보이거나, 원본까지 하얗게 나올 수 있습니다.</li>
+        </ul>
     </section>
 </main>
 </body>
