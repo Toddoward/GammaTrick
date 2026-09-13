@@ -299,9 +299,16 @@ function GTCoreFactory() {
     for (i = 0; i < lut.length; i++) for (ch = 0; ch < 3; ch++) a2b.u16(Math.round(clamp01(lut[i][ch]) * 65535));
     for (ch = 0; ch < 3; ch++) a2b.u16(0).u16(65535);
     tags.push(['A2B0', a2b.a]);
-    // A2B0를 모르는 CMS를 위한 대체 태그 (전부 검정 → 이미지가 드러나지 않음)
+    /*
+     * A2B0(3D LUT)를 안 읽고 행렬/TRC 쪽을 집는 CMS를 위한 예비 경로.
+     * "이 파일은 그냥 sRGB다"라고 적어 둔다. 그러면 그쪽 경로로 가는 뷰어는
+     * 저장된 값을 그대로 보여 준다 — 위장 이미지는 원래 색, 흰 화면은 흰 화면.
+     * 숨긴 이미지는 A2B0 없이는 재구성될 수 없으므로 그대로 안전하다.
+     * (예전엔 전부 0인 곡선을 넣었는데, 그쪽 경로를 타는 뷰어에서 색이 무너졌다)
+     */
     ['rXYZ', 'gXYZ', 'bXYZ'].forEach(function (t, j) { tags.push([t, new Bytes().str('XYZ ').zero(4).s15(M_D50[0][j]).s15(M_D50[1][j]).s15(M_D50[2][j]).a]); });
-    var curv = new Bytes().str('curv').zero(4).u32(2).u16(0).u16(0);
+    var curv = new Bytes().str('curv').zero(4).u32(256);
+    for (i = 0; i < 256; i++) curv.u16(Math.round(S2L[i] * 65535));
     ['rTRC', 'gTRC', 'bTRC'].forEach(function (t) { tags.push([t, curv.a]); });
 
     var n = tags.length, off = 128 + 4 + 12 * n, body = new Bytes(), table = new Bytes().u32(n);
@@ -340,17 +347,28 @@ function GTCoreFactory() {
    * extra: gAMA 또는 iCCP 청크 정보
    */
   function encodePNG(rgb, w, h, extra, deflate) {
-    var stride = w * 3, raw = new Uint8Array((stride + 1) * h);
+    /*
+     * 알파 채널(전부 255)을 넣어 컬러타입 6으로 쓴다.
+     * 알파가 없는 PNG는 안드로이드 디코더가 RGB_565(채널당 5/6/5비트)로
+     * 강등해 버릴 수 있다. 그러면 256-N..255 구간에 담아 둔 정보가
+     * 통째로 뭉개져 흰 화면만 남거나 색이 틀어진다.
+     */
+    var stride = w * 4, px = new Uint8Array(stride * h);
+    for (var p = 0, q = 0; p < w * h; p++, q += 3) {
+      var o4 = p * 4;
+      px[o4] = rgb[q]; px[o4 + 1] = rgb[q + 1]; px[o4 + 2] = rgb[q + 2]; px[o4 + 3] = 255;
+    }
+    var raw = new Uint8Array((stride + 1) * h);
     for (var y = 0; y < h; y++) {
       // 필터: None / Up 중 절댓값 합이 작은 쪽
-      var row = rgb.subarray(y * stride, (y + 1) * stride), prev = y > 0 ? rgb.subarray((y - 1) * stride, y * stride) : null;
+      var row = px.subarray(y * stride, (y + 1) * stride), prev = y > 0 ? px.subarray((y - 1) * stride, y * stride) : null;
       var o = y * (stride + 1), sNone = 0, sUp = 0;
       for (var i = 0; i < stride; i++) { sNone += row[i] < 128 ? row[i] : 256 - row[i]; if (prev) { var d = (row[i] - prev[i]) & 255; sUp += d < 128 ? d : 256 - d; } }
       if (prev && sUp < sNone) { raw[o] = 2; for (i = 0; i < stride; i++) raw[o + 1 + i] = (row[i] - prev[i]) & 255; }
       else { raw[o] = 0; raw.set(row, o + 1); }
     }
     var ihdr = new Uint8Array(13), dv = new DataView(ihdr.buffer);
-    dv.setUint32(0, w); dv.setUint32(4, h); ihdr[8] = 8; ihdr[9] = 2;
+    dv.setUint32(0, w); dv.setUint32(4, h); ihdr[8] = 8; ihdr[9] = 6;
     var jobs = [deflate(raw)];
     if (extra.icc) jobs.push(deflate(extra.icc));
     return Promise.all(jobs).then(function (res) {
